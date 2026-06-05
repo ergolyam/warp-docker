@@ -17,5 +17,6 @@ COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY scripts/warp-svc-wrapper /usr/local/bin/warp-svc-wrapper
 COPY scripts/warp-bootstrap /usr/local/bin/warp-bootstrap
 COPY scripts/warp-socat /usr/local/bin/warp-socat
+COPY scripts/supervisor-failfast /usr/local/bin/supervisor-failfast
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

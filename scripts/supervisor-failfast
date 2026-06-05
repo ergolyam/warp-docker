@@ -1,0 +1,113 @@
+#!/bin/sh
+set -eu
+
+field_value() {
+  key=$1
+  data=$2
+
+  for field in $data; do
+    case "$field" in
+      "$key":*)
+        printf '%s\n' "${field#*:}"
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+is_critical_process() {
+  case "$1" in
+    warp-svc|warp-bootstrap|warp-socat)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+should_shutdown() {
+  eventname=$1
+  processname=$2
+  expected=$3
+
+  if ! is_critical_process "$processname"; then
+    return 1
+  fi
+
+  case "$eventname" in
+    PROCESS_STATE_FATAL)
+      return 0
+      ;;
+    PROCESS_STATE_EXITED)
+      case "$processname" in
+        warp-svc|warp-socat)
+          return 0
+          ;;
+        warp-bootstrap)
+          if [ "$expected" != "1" ]; then
+            return 0
+          fi
+          ;;
+      esac
+      ;;
+  esac
+
+  return 1
+}
+
+request_shutdown() {
+  eventname=$1
+  processname=$2
+  expected=$3
+
+  printf 'Critical supervisor event: process=%s event=%s expected=%s. Shutting down container.\n' "$processname" "$eventname" "$expected" >&2
+
+  set +e
+  supervisorctl -c /etc/supervisor/supervisord.conf shutdown >/dev/null 2>&1
+  status=$?
+  set -e
+
+  if [ "$status" -ne 0 ]; then
+    printf 'supervisorctl shutdown failed with status %s\n' "$status" >&2
+  fi
+}
+
+read_payload() {
+  length=$1
+
+  case "$length" in
+    ''|*[!0-9]*)
+      length=0
+      ;;
+  esac
+
+  if [ "$length" -eq 0 ]; then
+    printf ''
+    return 0
+  fi
+
+  dd bs=1 count="$length" 2>/dev/null
+}
+
+while :; do
+  printf 'READY\n'
+
+  if ! IFS= read -r header; then
+    exit 0
+  fi
+
+  eventname=$(field_value eventname "$header" || printf '')
+  length=$(field_value len "$header" || printf '0')
+  payload=$(read_payload "$length")
+
+  processname=$(field_value processname "$payload" || printf '')
+  expected=$(field_value expected "$payload" || printf '')
+
+  if should_shutdown "$eventname" "$processname" "$expected"; then
+    request_shutdown "$eventname" "$processname" "$expected"
+  fi
+
+  printf 'RESULT 2\nOK'
+done
