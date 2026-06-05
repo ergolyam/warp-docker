@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+: "${WARP_PROXY_PORT:=40000}"
+: "${LISTEN_HOST:=0.0.0.0}"
+: "${LISTEN_PORT:=3080}"
+
+READY_FILE=/run/warp-proxy/configured
+
+echo "Waiting for WARP proxy configuration..."
+until [ -f "$READY_FILE" ]; do
+  sleep 1
+done
+
+echo "Exposing WARP proxy on ${LISTEN_HOST}:${LISTEN_PORT} -> 127.0.0.1:${WARP_PROXY_PORT}"
+
+exec socat \
+  "TCP-LISTEN:${LISTEN_PORT},fork,reuseaddr,bind=${LISTEN_HOST}" \
+  "TCP:127.0.0.1:${WARP_PROXY_PORT}"

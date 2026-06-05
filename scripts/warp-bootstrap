@@ -2,10 +2,12 @@
 set -eu
 
 : "${WARP_PROXY_PORT:=40000}"
-: "${LISTEN_HOST:=0.0.0.0}"
-: "${LISTEN_PORT:=3080}"
 
-supervisord -c /etc/supervisor/supervisord.conf
+READY_FILE=/run/warp-proxy/configured
+READY_DIR=$(dirname "$READY_FILE")
+
+mkdir -p "$READY_DIR"
+rm -f "$READY_FILE"
 
 echo "Waiting for warp-svc..."
 i=0
@@ -27,11 +29,8 @@ fi
 
 warp-cli --accept-tos tunnel protocol set MASQUE
 warp-cli --accept-tos mode proxy
-warp-cli --accept-tos proxy port "${WARP_PROXY_PORT}"
+warp-cli --accept-tos proxy port "$WARP_PROXY_PORT"
 warp-cli --accept-tos connect
 
-echo "Exposing WARP proxy on ${LISTEN_HOST}:${LISTEN_PORT} -> 127.0.0.1:${WARP_PROXY_PORT}"
-
-exec socat \
-  "TCP-LISTEN:${LISTEN_PORT},fork,reuseaddr,bind=${LISTEN_HOST}" \
-  "TCP:127.0.0.1:${WARP_PROXY_PORT}"
+printf '%s\n' "configured" > "$READY_FILE"
+echo "WARP proxy configured on 127.0.0.1:${WARP_PROXY_PORT}"

@@ -1,5 +1,5 @@
 # warp-docker
-This project builds a **small container image for Cloudflare WARP in local proxy mode**. It installs the official `cloudflare-warp` package, runs `warp-svc` under Supervisor, configures WARP for MASQUE + proxy mode, and exposes the local WARP proxy through `socat`.
+This project builds a **small container image for Cloudflare WARP in local proxy mode**. It installs the official `cloudflare-warp` package and runs `supervisord` as the container process manager. Supervisor starts `warp-svc`, configures WARP for MASQUE + proxy mode, and exposes the local WARP proxy through `socat`.
 
 ## Build & run locally
 
@@ -38,5 +38,6 @@ This project builds a **small container image for Cloudflare WARP in local proxy
 
 - **Local proxy appliance**: exposes Cloudflare WARP as a host-accessible proxy.
 - **Persistent registration**: keeps WARP identity in the `warp-data` Docker volume.
-- **Automatic startup**: registers, configures MASQUE + proxy mode, and connects on boot.
+- **Supervisor-managed startup**: `supervisord` owns `warp-svc`, one-time WARP bootstrap, and `socat`.
+- **Graceful shutdown**: stopping the container asks WARP to disconnect, terminates `warp-svc`, and stops `socat` as a process group.
 - **Configurable listener**: internal and external proxy ports can be changed with environment variables.

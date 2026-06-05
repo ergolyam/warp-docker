@@ -14,6 +14,8 @@ RUN apt-get update && \
 
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 
-COPY entrypoint.sh /entrypoint.sh
+COPY scripts/warp-svc-wrapper /usr/local/bin/warp-svc-wrapper
+COPY scripts/warp-bootstrap /usr/local/bin/warp-bootstrap
+COPY scripts/warp-socat /usr/local/bin/warp-socat
 
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

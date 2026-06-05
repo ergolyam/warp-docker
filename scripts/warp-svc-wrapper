@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+warp_svc_bin=$(command -v warp-svc)
+warp_svc_pid=
+
+stop_warp_svc() {
+  trap - INT TERM
+
+  echo "Disconnecting WARP before stopping warp-svc..."
+  warp-cli --accept-tos disconnect >/dev/null 2>&1 || true
+
+  if [ -n "$warp_svc_pid" ] && kill -0 "$warp_svc_pid" 2>/dev/null; then
+    kill -TERM "$warp_svc_pid" 2>/dev/null || true
+    wait "$warp_svc_pid" 2>/dev/null || true
+  fi
+
+  exit 0
+}
+
+trap stop_warp_svc INT TERM
+
+"$warp_svc_bin" &
+warp_svc_pid=$!
+
+set +e
+wait "$warp_svc_pid"
+status=$?
+set -e
+
+exit "$status"
