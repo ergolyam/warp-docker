@@ -2,9 +2,21 @@
 set -eu
 
 : "${WARP_PROXY_PORT:=40000}"
+: "${WARP_PROXY_RUN_DIR:=/run/warp-proxy}"
+: "${WARP_PROXY_READY_FILE:=$WARP_PROXY_RUN_DIR/configured}"
+: "${WARP_PROXY_STATUS_DIR:=$WARP_PROXY_RUN_DIR/status}"
 
-READY_FILE=/run/warp-proxy/configured
+READY_FILE=$WARP_PROXY_READY_FILE
 READY_DIR=$(dirname "$READY_FILE")
+STATUS_FILE=$WARP_PROXY_STATUS_DIR/warp-bootstrap
+
+record_exit_status() {
+  status=$?
+  mkdir -p "$WARP_PROXY_STATUS_DIR"
+  printf '%s\n' "$status" > "$STATUS_FILE"
+}
+
+trap record_exit_status EXIT
 
 mkdir -p "$READY_DIR"
 rm -f "$READY_FILE"

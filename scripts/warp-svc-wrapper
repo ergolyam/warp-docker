@@ -1,6 +1,19 @@
 #!/bin/sh
 set -eu
 
+: "${WARP_PROXY_RUN_DIR:=/run/warp-proxy}"
+: "${WARP_PROXY_STATUS_DIR:=$WARP_PROXY_RUN_DIR/status}"
+
+STATUS_FILE=$WARP_PROXY_STATUS_DIR/warp-svc
+
+record_exit_status() {
+  status=$?
+  mkdir -p "$WARP_PROXY_STATUS_DIR"
+  printf '%s\n' "$status" > "$STATUS_FILE"
+}
+
+trap record_exit_status EXIT
+
 warp_svc_bin=$(command -v warp-svc)
 warp_svc_pid=
 

@@ -4,8 +4,20 @@ set -eu
 : "${WARP_PROXY_PORT:=40000}"
 : "${LISTEN_HOST:=0.0.0.0}"
 : "${LISTEN_PORT:=3080}"
+: "${WARP_PROXY_RUN_DIR:=/run/warp-proxy}"
+: "${WARP_PROXY_READY_FILE:=$WARP_PROXY_RUN_DIR/configured}"
+: "${WARP_PROXY_STATUS_DIR:=$WARP_PROXY_RUN_DIR/status}"
 
-READY_FILE=/run/warp-proxy/configured
+READY_FILE=$WARP_PROXY_READY_FILE
+STATUS_FILE=$WARP_PROXY_STATUS_DIR/warp-socat
+
+record_exit_status() {
+  status=$?
+  mkdir -p "$WARP_PROXY_STATUS_DIR"
+  printf '%s\n' "$status" > "$STATUS_FILE"
+}
+
+trap record_exit_status EXIT
 
 echo "Waiting for WARP proxy configuration..."
 until [ -f "$READY_FILE" ]; do
@@ -14,6 +26,11 @@ done
 
 echo "Exposing WARP proxy on ${LISTEN_HOST}:${LISTEN_PORT} -> 127.0.0.1:${WARP_PROXY_PORT}"
 
-exec socat \
+set +e
+socat \
   "TCP-LISTEN:${LISTEN_PORT},fork,reuseaddr,bind=${LISTEN_HOST}" \
   "TCP:127.0.0.1:${WARP_PROXY_PORT}"
+status=$?
+set -e
+
+exit "$status"

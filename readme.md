@@ -39,6 +39,6 @@ This project builds a **small container image for Cloudflare WARP in local proxy
 - **Local proxy appliance**: exposes Cloudflare WARP as a host-accessible proxy.
 - **Persistent registration**: keeps WARP identity in the `warp-data` Docker volume.
 - **Supervisor-managed startup**: `supervisord` owns `warp-svc`, one-time WARP bootstrap, and `socat`.
-- **Fail-fast process supervision**: if `warp-svc`, `warp-bootstrap`, or `warp-socat` fails, Supervisor shuts down the remaining processes and the container exits.
+- **Fail-fast process supervision**: if `warp-svc`, `warp-bootstrap`, or `warp-socat` fails, Supervisor shuts down the remaining processes and the container exits with the failed service status.
 - **Graceful shutdown**: stopping the container asks WARP to disconnect, terminates `warp-svc`, and stops `socat` as a process group.
 - **Configurable listener**: internal and external proxy ports can be changed with environment variables.

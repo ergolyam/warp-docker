@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+: "${WARP_PROXY_RUN_DIR:=/run/warp-proxy}"
+: "${WARP_PROXY_STATUS_DIR:=$WARP_PROXY_RUN_DIR/status}"
+: "${WARP_PROXY_EXIT_CODE_FILE:=$WARP_PROXY_RUN_DIR/exit-code}"
+
 field_value() {
   key=$1
   data=$2
@@ -57,10 +61,70 @@ should_shutdown() {
   return 1
 }
 
+valid_exit_code() {
+  code=$1
+
+  case "$code" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+  esac
+
+  if [ "$code" -ge 0 ] && [ "$code" -le 255 ]; then
+    return 0
+  fi
+
+  return 1
+}
+
+read_process_exit_code() {
+  processname=$1
+  status_file=$WARP_PROXY_STATUS_DIR/$processname
+  code=
+
+  if [ -f "$status_file" ]; then
+    code=$(cat "$status_file" 2>/dev/null || printf '')
+    if valid_exit_code "$code"; then
+      printf '%s\n' "$code"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+failure_exit_code() {
+  processname=$1
+  code=$(read_process_exit_code "$processname" || printf '1')
+
+  if [ "$code" = "0" ]; then
+    case "$processname" in
+      warp-svc|warp-socat|warp-bootstrap)
+        code=1
+        ;;
+    esac
+  fi
+
+  printf '%s\n' "$code"
+}
+
+record_container_exit_code() {
+  processname=$1
+  code=$(failure_exit_code "$processname")
+
+  mkdir -p "$(dirname "$WARP_PROXY_EXIT_CODE_FILE")"
+
+  if [ ! -f "$WARP_PROXY_EXIT_CODE_FILE" ]; then
+    printf '%s\n' "$code" > "$WARP_PROXY_EXIT_CODE_FILE"
+  fi
+}
+
 request_shutdown() {
   eventname=$1
   processname=$2
   expected=$3
+
+  record_container_exit_code "$processname"
 
   printf 'Critical supervisor event: process=%s event=%s expected=%s. Shutting down container.\n' "$processname" "$eventname" "$expected" >&2
 

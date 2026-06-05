@@ -1,0 +1,69 @@
+#!/bin/sh
+set -eu
+
+: "${SUPERVISORD_BIN:=/usr/bin/supervisord}"
+: "${SUPERVISORD_CONF:=/etc/supervisor/supervisord.conf}"
+: "${SUPERVISORCTL_BIN:=supervisorctl}"
+: "${WARP_PROXY_RUN_DIR:=/run/warp-proxy}"
+: "${WARP_PROXY_EXIT_CODE_FILE:=$WARP_PROXY_RUN_DIR/exit-code}"
+
+supervisord_pid=
+
+valid_exit_code() {
+  code=$1
+
+  case "$code" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+  esac
+
+  if [ "$code" -ge 0 ] && [ "$code" -le 255 ]; then
+    return 0
+  fi
+
+  return 1
+}
+
+exit_with_recorded_status() {
+  fallback=$1
+  code=
+
+  if [ -f "$WARP_PROXY_EXIT_CODE_FILE" ]; then
+    code=$(cat "$WARP_PROXY_EXIT_CODE_FILE" 2>/dev/null || printf '')
+    if valid_exit_code "$code"; then
+      exit "$code"
+    fi
+
+    printf 'Invalid recorded container exit code: %s\n' "$code" >&2
+    exit 1
+  fi
+
+  exit "$fallback"
+}
+
+stop_supervisord() {
+  trap - INT TERM
+
+  if [ -n "$supervisord_pid" ] && kill -0 "$supervisord_pid" 2>/dev/null; then
+    "$SUPERVISORCTL_BIN" -c "$SUPERVISORD_CONF" shutdown >/dev/null 2>&1 || kill -TERM "$supervisord_pid" 2>/dev/null || true
+    wait "$supervisord_pid" 2>/dev/null || true
+  fi
+
+  exit_with_recorded_status 0
+}
+
+trap stop_supervisord INT TERM
+
+mkdir -p "$WARP_PROXY_RUN_DIR"
+rm -f "$WARP_PROXY_EXIT_CODE_FILE"
+
+"$SUPERVISORD_BIN" -c "$SUPERVISORD_CONF" &
+supervisord_pid=$!
+
+set +e
+wait "$supervisord_pid"
+supervisord_status=$?
+set -e
+
+exit_with_recorded_status "$supervisord_status"
